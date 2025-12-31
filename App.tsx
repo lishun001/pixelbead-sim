@@ -361,17 +361,25 @@ const App: React.FC = () => {
             const w = json.settings.width;
             const h = json.settings.height;
 
+            newGrid = Array(h).fill(null).map(() => Array(w).fill('#FFFFFF'));
+
             if (json.beads && Array.isArray(json.beads)) {
-                newGrid = Array(h).fill(null).map(() => Array(w).fill('#FFFFFF'));
                 json.beads.forEach((b: any) => {
                     if (b.y >= 0 && b.y < h && b.x >= 0 && b.x < w) {
-                        newGrid[b.y][b.x] = b.hex;
+                        // Lookup hex from palette based on the imported value (which might be index name or hex)
+                        // This supports both the new index format and potentially older hex formats
+                        const paletteColor = json.palette.find((p: PaletteColor) => p.name === b.hex || p.hex === b.hex);
+                        if (paletteColor) {
+                            newGrid[b.y][b.x] = paletteColor.hex;
+                        } else if (b.hex.startsWith('#')) {
+                            // Fallback if it looks like a hex code but not in palette
+                            newGrid[b.y][b.x] = b.hex;
+                        }
                     }
                 });
             } else if (json.grid && Array.isArray(json.grid)) {
+                // Legacy support
                 newGrid = json.grid;
-            } else {
-                 newGrid = Array(h).fill(null).map(() => Array(w).fill('#FFFFFF'));
             }
 
             updateStateAndHistory(newGrid, json.settings, null);
@@ -396,6 +404,9 @@ const App: React.FC = () => {
 
       gridData.forEach(row => {
           row.forEach(color => {
+              // Ignore empty white space (eraser) for stats
+              if (color.toLowerCase() === '#ffffff') return;
+
               stats[color] = (stats[color] || 0) + 1;
               totalBeads++;
           });
@@ -490,7 +501,21 @@ const App: React.FC = () => {
 
   const exportJSON = (filename: string) => {
     const beads: Array<{x: number, y: number, hex: string}> = [];
-    gridData.forEach((row, y) => row.forEach((color, x) => beads.push({ x, y, hex: color })));
+    
+    gridData.forEach((row, y) => row.forEach((colorHex, x) => {
+        // Skip empty white space if it is not in palette (Eraser)
+        if (colorHex.toLowerCase() === '#ffffff' && !palette.some(p => p.hex.toLowerCase() === '#ffffff')) {
+            return;
+        }
+
+        // Find the color in palette to get its Name (Index)
+        const matchedColor = palette.find(p => p.hex.toLowerCase() === colorHex.toLowerCase());
+        
+        // Use the Name (Index) if found, otherwise fallback to Hex
+        const colorValue = matchedColor ? (matchedColor.name || matchedColor.hex) : colorHex;
+
+        beads.push({ x, y, hex: colorValue });
+    }));
 
     const data = {
         version: "1.1",
