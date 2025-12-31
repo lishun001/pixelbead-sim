@@ -1,0 +1,5 @@
+{
+  "name": "PixelBead Sim",
+  "description": "A comprehensive perler bead simulator allowing image import, custom sizing (5-100px), palette management, and pixel editing.",
+  "requestFramePermissions": []
+}
